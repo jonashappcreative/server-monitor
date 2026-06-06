@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  server-monitor:
+    build: .
+    container_name: server-monitor
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Docker Socket - ermöglicht docker ps Befehle im Container
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+# Starten mit: docker-compose up -d
+# Logs: docker-compose logs -f server-monitor
+# Stopp: docker-compose down

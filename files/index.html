@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Monitor — Hetzner Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --color-bg: #0f172a;
+      --color-bg-secondary: #1e293b;
+      --color-bg-tertiary: #334155;
+      --color-text-primary: #f1f5f9;
+      --color-text-secondary: #cbd5e1;
+      --color-border: #475569;
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+      --color-info: #3b82f6;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --color-bg: #f8fafc;
+        --color-bg-secondary: #f1f5f9;
+        --color-bg-tertiary: #e2e8f0;
+        --color-text-primary: #0f172a;
+        --color-text-secondary: #475569;
+        --color-border: #cbd5e1;
+      }
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--color-bg);
+      color: var(--color-text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .header-meta {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      margin-top: 0.5rem;
+    }
+
+    .refresh-btn {
+      padding: 8px 16px;
+      background: var(--color-info);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.2s;
+    }
+
+    .refresh-btn:hover {
+      opacity: 0.9;
+    }
+
+    .refresh-btn.loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    /* Status Indicator */
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.online {
+      background: var(--color-success);
+    }
+
+    .status-dot.offline {
+      background: var(--color-danger);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Grid Layouts */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .stat-bar {
+      height: 4px;
+      background: var(--color-bg-tertiary);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .stat-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-info), var(--color-warning));
+      transition: width 0.3s ease;
+    }
+
+    /* Sections */
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--color-text-primary);
+    }
+
+    .list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--color-bg-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      background: var(--color-bg-tertiary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .card-info h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .card-info p {
+      font-size: 12px;
+      color: var(--color-text-secondary);
+    }
+
+    .card-stats {
+      display: grid;
+      grid-template-columns: auto auto auto;
+      gap: 2rem;
+      text-align: right;
+    }
+
+    .card-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .card-stat-label {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      margin-bottom: 0.25rem;
+    }
+
+    .card-stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--color-text-secondary);
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-info);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Error */
+    .error {
+      background: var(--color-danger);
+      color: white;
+      padding: 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .error.show {
+      display: block;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .card {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .card-stats {
+        grid-template-columns: repeat(2, 1fr);
+        width: 100%;
+        margin-top: 1rem;
+        gap: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>🖥️ Server Monitor</h1>
+        <p class="header-meta">server.jonashapp.com</p>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
+        <i class="fas fa-sync-alt"></i>
+        <span>Aktualisieren</span>
+      </button>
+    </div>
+
+    <!-- Error Message -->
+    <div class="error" id="errorMsg"></div>
+
+    <!-- System Stats -->
+    <div class="stats-grid" id="statsGrid">
+      <!-- TODO: Stats werden hier eingefügt -->
+      <div class="stat-card" style="grid-column: 1/-1;">
+        <div class="loading">
+          <span class="loading-spinner"></span>
+          Verbinde mit Server...
+        </div>
+      </div>
+    </div>
+
+    <!-- Docker Containers -->
+    <div class="section">
+      <h2 class="section-title">🐳 Docker Container</h2>
+      <div class="list-container" id="containersList">
+        <div class="loading">
+          <span class="loading-spinner"></span>
+          Lade Container...
+        </div>
+      </div>
+    </div>
+
+    <!-- Services -->
+    <div class="section">
+      <h2 class="section-title">⚙️ Services & Ports</h2>
+      <div class="list-container" id="servicesList">
+        <div class="loading">
+          <span class="loading-spinner"></span>
+          Lade Services...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+    const REFRESH_INTERVAL = 5000; // 5 Sekunden
+    let refreshInterval;
+
+    /**
+     * Fetch data von API
+     */
+    async function fetchStats() {
+      try {
+        const response = await fetch(`${API_BASE}/stats`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        updateDashboard(data);
+        hideError();
+      } catch (error) {
+        console.error('Fehler beim Abrufen der Daten:', error);
+        showError(`Verbindungsfehler: ${error.message}`);
+      }
+    }
+
+    /**
+     * Update Dashboard mit Daten
+     */
+    function updateDashboard(data) {
+      updateStats(data.system);
+      updateContainers(data.containers);
+      updateServices(data.services);
+    }
+
+    /**
+     * Update System Stats
+     */
+    function updateStats(system) {
+      const html = `
+        <div class="stat-card">
+          <div class="stat-label">CPU Usage</div>
+          <div class="stat-value">${system.cpu.toFixed(1)}%</div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill" style="width: ${system.cpu}%"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Memory</div>
+          <div class="stat-value">${system.memory.toFixed(1)} GB</div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill" style="width: ${(system.memory / system.memoryTotal) * 100}%"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Disk Usage</div>
+          <div class="stat-value">${system.disk.toFixed(1)}%</div>
+          <div class="stat-bar">
+            <div class="stat-bar-fill" style="width: ${system.disk}%"></div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value">${system.uptime} days</div>
+        </div>
+      `;
+      document.getElementById('statsGrid').innerHTML = html;
+    }
+
+    /**
+     * Update Container Liste
+     */
+    function updateContainers(containers) {
+      if (!containers || containers.length === 0) {
+        document.getElementById('containersList').innerHTML = 
+          '<p style="text-align: center; color: var(--color-text-secondary); padding: 2rem;">Keine Container gefunden</p>';
+        return;
+      }
+
+      const html = containers.map(c => `
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon">🐳</div>
+            <div class="card-info">
+              <h3>${c.name}</h3>
+              <p>Port${c.ports.includes(',') ? 's' : ''}: ${c.ports || 'none'}</p>
+            </div>
+          </div>
+          <div class="card-stats">
+            <div class="card-stat">
+              <span class="card-stat-label">Status</span>
+              <span class="card-stat-value">
+                <span class="status-dot ${c.status === 'running' ? 'online' : 'offline'}" style="display: inline-block; margin-right: 4px;"></span>
+                ${c.status === 'running' ? 'Running' : 'Stopped'}
+              </span>
+            </div>
+            <div class="card-stat">
+              <span class="card-stat-label">Uptime</span>
+              <span class="card-stat-value">${c.uptime || '—'}</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+      
+      document.getElementById('containersList').innerHTML = html;
+    }
+
+    /**
+     * Update Services Liste
+     */
+    function updateServices(services) {
+      if (!services || services.length === 0) {
+        document.getElementById('servicesList').innerHTML = 
+          '<p style="text-align: center; color: var(--color-text-secondary); padding: 2rem;">Keine Services konfiguriert</p>';
+        return;
+      }
+
+      const html = services.map(s => `
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon">⚙️</div>
+            <div class="card-info">
+              <h3>${s.name}</h3>
+              <p>${s.url}</p>
+            </div>
+          </div>
+          <div class="card-stats">
+            <div class="card-stat" style="grid-column: 1/-1;">
+              <span class="status-indicator">
+                <span class="status-dot ${s.status === 'running' ? 'online' : 'offline'}"></span>
+                ${s.status === 'running' ? '✓ Online' : '✗ Offline'}
+              </span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+      
+      document.getElementById('servicesList').innerHTML = html;
+    }
+
+    /**
+     * Error Handling
+     */
+    function showError(message) {
+      const errorEl = document.getElementById('errorMsg');
+      errorEl.textContent = message;
+      errorEl.classList.add('show');
+    }
+
+    function hideError() {
+      document.getElementById('errorMsg').classList.remove('show');
+    }
+
+    /**
+     * Manual Refresh
+     */
+    function manualRefresh() {
+      const btn = document.getElementById('refreshBtn');
+      btn.classList.add('loading');
+      fetchStats().then(() => {
+        btn.classList.remove('loading');
+      });
+    }
+
+    /**
+     * Auto-Refresh starten
+     */
+    function startAutoRefresh() {
+      fetchStats(); // Initial load
+      refreshInterval = setInterval(fetchStats, REFRESH_INTERVAL);
+    }
+
+    /**
+     * Init
+     */
+    document.addEventListener('DOMContentLoaded', startAutoRefresh);
+    window.addEventListener('beforeunload', () => clearInterval(refreshInterval));
+  </script>
+</body>
+</html>
